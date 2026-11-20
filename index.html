@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tone Generator</title>
+<style>
+  :root { color-scheme: light dark; --accent:#3b82f6; }
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  p.sub { opacity: .7; margin: 0 0 24px; }
+  .freq { font-size: 3rem; font-weight: 600; margin: 8px 0; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .ticks { display:flex; justify-content:space-between; font-size:.8rem; opacity:.6; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; align-items:center; }
+  button, select, input[type=number] { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #8884; background: transparent; color: inherit; }
+  button.on, #play { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #play { font-size: 1.1rem; padding: 12px 28px; }
+  input[type=number] { width: 120px; }
+  .note { font-size: .9rem; opacity: .75; margin-top: 24px; }
+  label { font-size: .9rem; opacity: .8; }
+</style>
+</head>
+<body>
+<h1>Tone Generator</h1>
+<p class="sub">Any frequency from 20 Hz to 20 kHz.</p>
+
+<div class="freq" id="shown">440 Hz</div>
+<input type="range" id="slider" min="0" max="1000">
+<div class="ticks"><span>20 Hz</span><span>200 Hz</span><span>2 kHz</span><span>20 kHz</span></div>
+
+<div class="row">
+  <button data-mul="0.5">−1 octave</button>
+  <button data-add="-10">−10 Hz</button>
+  <button data-add="10">+10 Hz</button>
+  <button data-mul="2">+1 octave</button>
+  <input type="number" id="exact" min="20" max="20000" value="440"> <label for="exact">Hz</label>
+</div>
+<div class="row" id="presets"></div>
+
+<div class="row">
+  <button id="play">Play</button>
+  <select id="wave">
+    <option value="sine">Sine</option><option value="triangle">Triangle</option>
+    <option value="square">Square</option><option value="sawtooth">Sawtooth</option>
+  </select>
+</div>
+<label>Volume <span id="volv">30</span>%</label>
+<input type="range" id="vol" min="0" max="100" value="30">
+
+<p class="note">Start with the volume low. On iPhone, turn off the silent switch or you won't hear anything. Most adults stop hearing somewhere between 14 and 17 kHz.</p>
+
+<script>
+const MIN=20, MAX=20000, STEPS=1000;
+const p2f=p=>Math.round(MIN*Math.pow(MAX/MIN,p/STEPS));
+const f2p=f=>Math.round(Math.log(f/MIN)/Math.log(MAX/MIN)*STEPS);
+const $=id=>document.getElementById(id);
+let freq=440, ctx=null, osc=null, gain=null;
+const PRESETS=[20,60,100,250,440,1000,4000,8000,12000,16000,20000];
+const pres=$('presets');
+PRESETS.forEach(p=>{const b=document.createElement('button');b.textContent=p>=1000?p/1000+'k':p;b.onclick=()=>setF(p);b.dataset.p=p;pres.appendChild(b);});
+function vol(){return $('vol').value/100*0.5;}
+function setF(f){
+  freq=Math.min(MAX,Math.max(MIN,Math.round(f)));
+  $('slider').value=f2p(freq); $('exact').value=freq;
+  $('shown').textContent=freq>=1000?(freq/1000).toFixed(freq%1000?2:0)+' kHz':freq+' Hz';
+  pres.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.p===freq));
+  if(osc) osc.frequency.setTargetAtTime(freq,ctx.currentTime,0.01);
+}
+$('slider').oninput=e=>setF(p2f(+e.target.value));
+$('exact').onchange=e=>setF(+e.target.value);
+document.querySelectorAll('[data-mul]').forEach(b=>b.onclick=()=>setF(freq*+b.dataset.mul));
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>setF(freq+ +b.dataset.add));
+$('vol').oninput=e=>{$('volv').textContent=e.target.value; if(gain) gain.gain.setTargetAtTime(vol(),ctx.currentTime,0.02);};
+$('wave').onchange=e=>{if(osc) osc.type=e.target.value;};
+$('play').onclick=async()=>{
+  if(osc){ gain.gain.setTargetAtTime(0,ctx.currentTime,0.02); osc.stop(ctx.currentTime+0.15); osc=null; gain=null; $('play').textContent='Play'; return; }
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+  await ctx.resume();
+  osc=ctx.createOscillator(); gain=ctx.createGain();
+  osc.type=$('wave').value; osc.frequency.value=freq; gain.gain.value=0;
+  osc.connect(gain); gain.connect(ctx.destination); osc.start();
+  gain.gain.setTargetAtTime(vol(),ctx.currentTime,0.02);
+  $('play').textContent='Stop';
+};
+setF(440);
+</script>
+</body>
+</html>
