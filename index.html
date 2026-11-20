@@ -48,9 +48,10 @@
 <label>Volume <span id="volv">30</span>%</label>
 <input type="range" id="vol" min="0" max="100" value="30">
 
-<p class="note">Start with the volume low. On iPhone, turn off the silent switch or you won't hear anything. Most adults stop hearing somewhere between 14 and 17 kHz.</p>
+<p class="note">Start with the volume low. On iPhone this plays even in Silent mode; turn the phone's volume up. Most adults stop hearing somewhere between 14 and 17 kHz.</p>
 
 <script>
+try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
 const MIN=20, MAX=20000, STEPS=1000;
 const p2f=p=>Math.round(MIN*Math.pow(MAX/MIN,p/STEPS));
 const f2p=f=>Math.round(Math.log(f/MIN)/Math.log(MAX/MIN)*STEPS);
@@ -75,6 +76,8 @@ $('vol').oninput=e=>{$('volv').textContent=e.target.value; if(gain) gain.gain.se
 $('wave').onchange=e=>{if(osc) osc.type=e.target.value;};
 $('play').onclick=async()=>{
   if(osc){ gain.gain.setTargetAtTime(0,ctx.currentTime,0.02); osc.stop(ctx.currentTime+0.15); osc=null; gain=null; $('play').textContent='Play'; return; }
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  if(!window.__unlock){ const a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='); a.setAttribute('playsinline',''); a.loop=true; a.play().catch(()=>{}); window.__unlock=a; }
   ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
   await ctx.resume();
   osc=ctx.createOscillator(); gain=ctx.createGain();
